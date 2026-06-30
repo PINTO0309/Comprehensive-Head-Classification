@@ -1,9 +1,9 @@
 # Comprehensive-Head-Classification
-Comprehensive Head Classification. Presence/absence of sunglasses, presence/absence of a mask, presence/absence of a hat, eyes open/closed, mouth open/closed, simple/complex background, face image quality assessment (FIQA).
+Comprehensive head classification. Presence/absence of hats, sunglasses, and masks; eyes open/closed; mouth open/closed; background simplicity/complexity; and Face Image Quality Assessment (FIQA).
 
 It is capable of rapidly performing seven types of classification and inference in a single inference pass.
 
-<img width="1884" height="1075" alt="image" src="https://github.com/user-attachments/assets/41dfd45d-2f34-4c10-b0a2-f20d72a921f3" />
+<img width="2101" height="1073" alt="image" src="https://github.com/user-attachments/assets/456599bf-d18a-4d8a-b1be-3d5f88e52514" />
 
 ## Build merged ONNX models
 
@@ -28,6 +28,8 @@ uv run build-chc-onnx --variant s --output /path/to/output.onnx
 ```
 
 ## Benchmark ONNX models
+
+Download `chc_*.onnx` from [models](https://github.com/PINTO0309/Comprehensive-Head-Classification/releases/tag/models) and place them in the root folder.
 
 Use `sit4onnx` through uv after building the merged ONNX files:
 
@@ -70,6 +72,8 @@ For `chc_s_wo_fiqa.onnx`, omit `head_image_352x352.npy`.
 
 ## Browser benchmark app
 
+Download `chc_*.onnx` and `chc_*.tflite` from [models](https://github.com/PINTO0309/Comprehensive-Head-Classification/releases/tag/models) and place them in the root folder.
+
 The Electron benchmark app lives in `benchmark-app/` and runs ONNX Runtime Web
 or LiteRT.js inside the Chromium renderer. JavaScript dependencies are pinned
 exactly in `package.json` and locked by `pnpm-lock.yaml`.
@@ -88,7 +92,7 @@ During `vite build`, the same plugin copies models into
 `benchmark-app/dist/litert/wasm/`. These copied assets are generated files and
 are not tracked by git.
 
-<img width="900" alt="image" src="https://github.com/user-attachments/assets/da95f5ef-7880-4ac2-afc8-e43a6bb0c79e" />
+<img width="900" alt="image" src="https://github.com/user-attachments/assets/16d0849d-f3ad-4e27-a243-d821261fabf6" />
 
 During dev, root-level `chc_*.onnx` files and ONNX Runtime Web assets are served
 directly by the Vite asset plugin. During `vite build`, the same plugin copies
