@@ -3,6 +3,28 @@ Comprehensive head classification. Presence/absence of hats, sunglasses, and mas
 
 It is capable of rapidly performing seven types of classification and inference in a single inference pass.
 
+Merged model inputs:
+
+- `head_image_48x48`: `[1, 3, 48, 48]`, head crop used for background, mask, sunglasses, and hat classification
+- `eye_images_24x40`: `[2, 3, 24, 40]`, two eye crops used for eye-open classification
+- `mouth_image_30x48`: `[1, 3, 30, 48]`, mouth crop used for mouth-open classification
+- `head_image_352x352`: `[1, 3, 352, 352]`, head crop used for FIQA in FIQA-enabled models
+
+Input normalization:
+
+- `head_image_48x48`, `eye_images_24x40`, and `mouth_image_30x48`: RGB `float32`, normalized to `0.0..1.0` by dividing pixel values by `255`
+- `head_image_352x352`: RGB `float32`, normalized to `0.0..1.0` and then ImageNet-normalized with mean `[0.485, 0.456, 0.406]` and std `[0.229, 0.224, 0.225]`
+
+Merged model outputs:
+
+- `prob_bg_plain`: `[1]`, probability that the background is plain/simple
+- `prob_masked`: `[1]`, probability that the person is wearing a mask
+- `prob_sunglass`: `[1]`, probability that the person is wearing sunglasses
+- `prob_hat`: `[1]`, probability that the person is wearing a hat
+- `prob_eye_open`: `[2]`, probability that each eye is open
+- `prob_mouth_open`: `[1]`, probability that the mouth is open
+- `quality_score`: `[1, 1]`, face image quality score for FIQA-enabled models
+
 <img width="2101" height="1073" alt="image" src="https://github.com/user-attachments/assets/456599bf-d18a-4d8a-b1be-3d5f88e52514" />
 
 ## Build merged ONNX models
