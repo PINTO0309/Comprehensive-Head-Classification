@@ -1,0 +1,19 @@
+[project]
+name = "comprehensive-head-classification"
+version = "0.1.0"
+description = "Utilities for building Comprehensive Head Classification ONNX models."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "numpy==2.5.0",
+    "onnx==1.22.0",
+    "onnxruntime-gpu==1.26.0",
+    "onnxsim==0.6.5",
+    "sit4onnx==1.0.10",
+]
+
+[project.scripts]
+build-chc-onnx = "build_chc_onnx:main"
+
+[tool.uv]
+package = true
