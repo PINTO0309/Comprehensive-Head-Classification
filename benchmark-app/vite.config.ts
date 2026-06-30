@@ -9,18 +9,28 @@ const appDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(appDir, '..');
 const require = createRequire(import.meta.url);
 const ortSourceDir = path.dirname(require.resolve('onnxruntime-web'));
+const liteRtWasmSourceDir = path.join(path.dirname(require.resolve('@litertjs/core')), '..', 'wasm');
 const ortAssetPattern = /^ort-.*\.(wasm|mjs)$/;
-const modelPattern = /^chc_.+\.onnx$/;
+const liteRtAssetPattern = /^litert_wasm_.*\.(wasm|js)$/;
+const onnxModelPattern = /^chc_.+\.onnx$/;
+const tfliteModelPattern = /^chc_.+_float32\.tflite$/;
+const modelPattern = /^(chc_.+\.onnx|chc_.+_float32\.tflite)$/;
 
 type ModelEntry = {
   name: string;
   path: string;
   bytes: number;
   withFiqa: boolean;
+  format: 'onnx' | 'tflite';
+  runtime: 'onnxruntime-web' | 'litert';
 };
 
 async function listOrtAssets(): Promise<string[]> {
   return (await readdir(ortSourceDir)).filter((file) => ortAssetPattern.test(file));
+}
+
+async function listLiteRtAssets(): Promise<string[]> {
+  return (await readdir(liteRtWasmSourceDir)).filter((file) => liteRtAssetPattern.test(file));
 }
 
 async function listModels(): Promise<ModelEntry[]> {
@@ -40,9 +50,11 @@ async function listModels(): Promise<ModelEntry[]> {
       path: `/models/${entry}`,
       bytes: sourceStat.size,
       withFiqa: !entry.includes('_wo_fiqa'),
+      format: onnxModelPattern.test(entry) ? 'onnx' : 'tflite',
+      runtime: onnxModelPattern.test(entry) ? 'onnxruntime-web' : 'litert',
     });
   }
-  return models.sort((a, b) => a.name.localeCompare(b.name));
+  return models.sort((a, b) => a.runtime.localeCompare(b.runtime) || a.name.localeCompare(b.name));
 }
 
 function modelManifest(models: ModelEntry[]): string {
@@ -54,6 +66,9 @@ function contentTypeFor(fileName: string): string {
     return 'application/wasm';
   }
   if (fileName.endsWith('.onnx')) {
+    return 'application/octet-stream';
+  }
+  if (fileName.endsWith('.tflite')) {
     return 'application/octet-stream';
   }
   if (fileName.endsWith('.json')) {
@@ -106,6 +121,31 @@ function benchmarkAssetsPlugin(): Plugin {
           return;
         }
 
+        if (pathname.startsWith('/litert/wasm/')) {
+          const fileName = path.basename(decodeURIComponent(pathname));
+          if (!liteRtAssetPattern.test(fileName)) {
+            res.statusCode = 404;
+            res.end('Not found');
+            return;
+          }
+          const sourcePath = path.join(liteRtWasmSourceDir, fileName);
+          try {
+            const sourceStat = await stat(sourcePath);
+            if (!sourceStat.isFile()) {
+              res.statusCode = 404;
+              res.end('Not found');
+              return;
+            }
+            res.setHeader('Content-Type', contentTypeFor(fileName));
+            res.setHeader('Content-Length', sourceStat.size);
+            res.setHeader('Cache-Control', 'no-cache');
+            createReadStream(sourcePath).pipe(res);
+          } catch (error) {
+            next(error);
+          }
+          return;
+        }
+
         if (!pathname.startsWith('/ort/')) {
           next();
           return;
@@ -141,6 +181,14 @@ function benchmarkAssetsPlugin(): Plugin {
       await mkdir(ortTargetDir, { recursive: true });
       await Promise.all(
         ortFiles.map((file) => copyFile(path.join(ortSourceDir, file), path.join(ortTargetDir, file))),
+      );
+
+      const liteRtTargetDir = path.join(appDir, 'dist', 'litert', 'wasm');
+      const liteRtFiles = await listLiteRtAssets();
+      await rm(liteRtTargetDir, { recursive: true, force: true });
+      await mkdir(liteRtTargetDir, { recursive: true });
+      await Promise.all(
+        liteRtFiles.map((file) => copyFile(path.join(liteRtWasmSourceDir, file), path.join(liteRtTargetDir, file))),
       );
 
       const modelTargetDir = path.join(appDir, 'dist', 'models');

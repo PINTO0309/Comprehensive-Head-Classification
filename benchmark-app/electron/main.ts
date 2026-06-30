@@ -3,6 +3,7 @@ import path from 'node:path';
 
 type CliBenchmarkOptions = {
   auto: boolean;
+  runtime: 'onnxruntime-web' | 'litert';
   backend: 'wasm' | 'webgpu';
   model: string;
   warmup: number;
@@ -35,8 +36,10 @@ function parseCliBenchmarkOptions(): CliBenchmarkOptions {
     return found ? found.slice(prefix.length) : fallback;
   };
   const backend = readValue('backend', 'wasm');
+  const runtime = readValue('runtime', 'onnxruntime-web');
   return {
     auto: args.includes('--benchmark'),
+    runtime: runtime === 'litert' ? 'litert' : 'onnxruntime-web',
     backend: backend === 'webgpu' ? 'webgpu' : 'wasm',
     model: readValue('model', 'chc_s.onnx'),
     warmup: Number(readValue('warmup', '2')),
@@ -50,6 +53,7 @@ function benchmarkUrl(baseUrl: string, options: CliBenchmarkOptions): string {
   }
   const url = new URL(baseUrl);
   url.searchParams.set('auto', '1');
+  url.searchParams.set('runtime', options.runtime);
   url.searchParams.set('backend', options.backend);
   url.searchParams.set('model', options.model);
   url.searchParams.set('warmup', String(options.warmup));
@@ -98,6 +102,7 @@ async function createWindow() {
     query: cliOptions.auto
       ? {
           auto: '1',
+          runtime: cliOptions.runtime,
           backend: cliOptions.backend,
           model: cliOptions.model,
           warmup: String(cliOptions.warmup),

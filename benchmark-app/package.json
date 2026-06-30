@@ -10,9 +10,12 @@
     "build": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json && vite build",
     "preview": "node scripts/preview.mjs",
     "benchmark:wasm": "node scripts/benchmark.mjs wasm",
-    "benchmark:webgpu": "node scripts/benchmark.mjs webgpu"
+    "benchmark:webgpu": "node scripts/benchmark.mjs webgpu",
+    "benchmark:litert:wasm": "node scripts/benchmark.mjs litert wasm",
+    "benchmark:litert:webgpu": "node scripts/benchmark.mjs litert webgpu"
   },
   "dependencies": {
+    "@litertjs/core": "2.5.2",
     "onnxruntime-web": "1.27.0"
   },
   "devDependencies": {

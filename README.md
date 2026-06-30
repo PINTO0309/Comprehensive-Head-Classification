@@ -67,8 +67,8 @@ For `chc_s_wo_fiqa.onnx`, omit `head_image_352x352.npy`.
 ## Browser benchmark app
 
 The Electron benchmark app lives in `benchmark-app/` and runs ONNX Runtime Web
-inside the Chromium renderer. JavaScript dependencies are pinned exactly in
-`package.json` and locked by `pnpm-lock.yaml`.
+or LiteRT.js inside the Chromium renderer. JavaScript dependencies are pinned
+exactly in `package.json` and locked by `pnpm-lock.yaml`.
 
 ```bash
 cd benchmark-app
@@ -76,11 +76,13 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-During dev, root-level `chc_*.onnx` files and ONNX Runtime Web assets are served
-directly by the Vite asset plugin. During `vite build`, the same plugin copies
-models into `benchmark-app/dist/models/` and ONNX Runtime Web assets into
-`benchmark-app/dist/ort/`. These copied assets are generated files and are not
-tracked by git.
+During dev, root-level `chc_*.onnx`, `chc_*_float32.tflite`, ONNX Runtime Web
+assets, and LiteRT.js Wasm assets are served directly by the Vite asset plugin.
+During `vite build`, the same plugin copies models into
+`benchmark-app/dist/models/`, ONNX Runtime Web assets into
+`benchmark-app/dist/ort/`, and LiteRT.js assets into
+`benchmark-app/dist/litert/wasm/`. These copied assets are generated files and
+are not tracked by git.
 
 Build and smoke-test the app:
 
@@ -88,9 +90,11 @@ Build and smoke-test the app:
 cd benchmark-app
 pnpm build
 pnpm benchmark:wasm
+pnpm benchmark:litert:wasm
 pnpm benchmark:webgpu
+pnpm benchmark:litert:webgpu
 ```
 
-`benchmark:wasm` should run anywhere Electron can start. `benchmark:webgpu`
-requires a Chromium WebGPU-capable environment and may report that the backend is
-unsupported when no GPU adapter is available.
+The WASM smoke scripts should run anywhere Electron can start. WebGPU smoke
+scripts require a Chromium WebGPU-capable environment and may report that the
+backend is unsupported when no GPU adapter is available.

@@ -1,12 +1,15 @@
 import './styles.css';
 
 type Backend = 'wasm' | 'webgpu';
+type Runtime = 'onnxruntime-web' | 'litert';
 
 type ModelEntry = {
   name: string;
   path: string;
   bytes: number;
   withFiqa: boolean;
+  format: 'onnx' | 'tflite';
+  runtime: Runtime;
 };
 
 type Manifest = {
@@ -15,9 +18,11 @@ type Manifest = {
 };
 
 type OrtModule = typeof import('onnxruntime-web');
+type LiteRtModule = typeof import('@litertjs/core');
 
 type BenchmarkResult = {
   modelName: string;
+  runtime: Runtime;
   backend: Backend;
   warmup: number;
   runs: number;
@@ -41,12 +46,19 @@ app.innerHTML = `
     <header class="header">
       <div>
         <h1>CHC Web Benchmark</h1>
-        <p>Browser renderer benchmark for ONNX Runtime Web with WASM and WebGPU.</p>
+        <p>Browser renderer benchmark for ONNX Runtime Web and LiteRT.js with WASM and WebGPU.</p>
       </div>
       <div class="status" id="status">Loading manifest...</div>
     </header>
 
     <section class="panel controls">
+      <label>
+        <span>Runtime</span>
+        <select id="runtime">
+          <option value="onnxruntime-web">onnxruntime-web</option>
+          <option value="litert">LiteRT.js</option>
+        </select>
+      </label>
       <label>
         <span>Model</span>
         <select id="model"></select>
@@ -88,6 +100,7 @@ app.innerHTML = `
 `;
 
 const statusEl = document.querySelector<HTMLDivElement>('#status')!;
+const runtimeSelect = document.querySelector<HTMLSelectElement>('#runtime')!;
 const modelSelect = document.querySelector<HTMLSelectElement>('#model')!;
 const backendSelect = document.querySelector<HTMLSelectElement>('#backend')!;
 const warmupInput = document.querySelector<HTMLInputElement>('#warmup')!;
@@ -99,6 +112,17 @@ const samplesEl = document.querySelector<HTMLPreElement>('#samples')!;
 
 let manifest: Manifest = { generatedAt: '', models: [] };
 let webGpuAvailable = false;
+let liteRtModulePromise: Promise<LiteRtModule> | undefined;
+let liteRtRuntimePromise: Promise<unknown> | undefined;
+let liteRtJspiSupportedPromise: Promise<boolean> | undefined;
+const outputOrder = [
+  'prob_background_plain',
+  'prob_masked',
+  'prob_sunglasses',
+  'prob_eye_open',
+  'prob_mouth_open',
+  'quality_score',
+];
 
 function seededFloat32Array(length: number, seed: number): Float32Array {
   const data = new Float32Array(length);
@@ -130,7 +154,17 @@ async function loadOrt(backend: Backend): Promise<OrtModule> {
   return await import('onnxruntime-web');
 }
 
-async function createSession(model: ModelEntry, backend: Backend) {
+async function loadLiteRt(): Promise<LiteRtModule> {
+  liteRtModulePromise ??= import('@litertjs/core');
+  const liteRt = await liteRtModulePromise;
+  liteRtJspiSupportedPromise ??= liteRt.supportsFeature('jspi');
+  const jspiSupported = await liteRtJspiSupportedPromise;
+  liteRtRuntimePromise ??= liteRt.loadLiteRt('/litert/wasm/', { threads: false, jspi: jspiSupported });
+  await liteRtRuntimePromise;
+  return liteRt;
+}
+
+async function createOnnxSession(model: ModelEntry, backend: Backend) {
   const ort = await loadOrt(backend);
   ort.env.wasm.wasmPaths = '/ort/';
   ort.env.wasm.numThreads = 1;
@@ -165,10 +199,17 @@ async function createSession(model: ModelEntry, backend: Backend) {
 }
 
 async function checkWebGpuAvailable(): Promise<boolean> {
-  return 'gpu' in navigator;
+  const gpu = (navigator as Navigator & { gpu?: { requestAdapter?: () => Promise<unknown> } }).gpu;
+  if (!gpu) {
+    return false;
+  }
+  if (!gpu.requestAdapter) {
+    return true;
+  }
+  return (await gpu.requestAdapter()) !== null;
 }
 
-function makeFeeds(ort: OrtModule, session: Awaited<ReturnType<typeof createSession>>['session']) {
+function makeOnnxFeeds(ort: OrtModule, session: Awaited<ReturnType<typeof createOnnxSession>>['session']) {
   const feeds: Record<string, InstanceType<OrtModule['Tensor']>> = {};
   for (const [index, input] of session.inputNames.entries()) {
     const metadata = session.inputMetadata[index];
@@ -189,6 +230,72 @@ function makeFeeds(ort: OrtModule, session: Awaited<ReturnType<typeof createSess
   return feeds;
 }
 
+async function createLiteRtModel(model: ModelEntry, backend: Backend) {
+  if (backend === 'webgpu' && !(await checkWebGpuAvailable())) {
+    throw new Error('WebGPU is unsupported in this Chromium runtime or no GPU adapter is available.');
+  }
+
+  const loadStart = performance.now();
+  const liteRt = await loadLiteRt();
+  let compiledModel: Awaited<ReturnType<LiteRtModule['loadAndCompile']>>;
+  try {
+    const compilePromise = liteRt.loadAndCompile(model.path, {
+      accelerator: backend,
+      cpuOptions: { numThreads: 1 },
+    });
+    compiledModel =
+      backend === 'webgpu'
+        ? await Promise.race([
+            compilePromise,
+            new Promise<never>((_resolve, reject) => {
+              window.setTimeout(
+                () => reject(new Error('Timed out while creating a LiteRT.js WebGPU model.')),
+                10000,
+              );
+            }),
+          ])
+        : await compilePromise;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`LiteRT.js ${backend.toUpperCase()} model creation failed: ${message}`);
+  }
+  return { liteRt, compiledModel, loadMs: performance.now() - loadStart };
+}
+
+function makeLiteRtFeeds(
+  liteRt: LiteRtModule,
+  compiledModel: Awaited<ReturnType<LiteRtModule['loadAndCompile']>>,
+): Record<string, InstanceType<LiteRtModule['Tensor']>> {
+  const feeds: Record<string, InstanceType<LiteRtModule['Tensor']>> = {};
+  for (const input of compiledModel.getInputDetails()) {
+    if (input.dtype !== 'float32') {
+      throw new Error(`Input ${input.name} has unsupported dtype ${input.dtype}`);
+    }
+    const dims = Array.from(input.shape, (dim) => {
+      if (dim <= 0) {
+        throw new Error(`Input ${input.name} has non-static dimension ${String(dim)}`);
+      }
+      return dim;
+    });
+    feeds[input.name] = new liteRt.Tensor(seededFloat32Array(tensorSize(dims), inputSeed(input.name)), dims);
+  }
+  return feeds;
+}
+
+function deleteLiteRtTensors(tensors: Iterable<{ delete(): void }>) {
+  for (const tensor of tensors) {
+    tensor.delete();
+  }
+}
+
+function sortOutputMetadata(outputs: Array<{ name: string; dims: readonly number[]; type: string }>) {
+  return outputs.sort((a, b) => {
+    const aIndex = outputOrder.indexOf(a.name);
+    const bIndex = outputOrder.indexOf(b.name);
+    return (aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex) - (bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex);
+  });
+}
+
 function percentile(sorted: readonly number[], p: number): number {
   if (sorted.length === 0) {
     return 0;
@@ -197,14 +304,14 @@ function percentile(sorted: readonly number[], p: number): number {
   return sorted[index];
 }
 
-async function runBenchmark(
+async function runOnnxBenchmark(
   model: ModelEntry,
   backend: Backend,
   warmup: number,
   runs: number,
 ): Promise<BenchmarkResult> {
-  const { ort, session, loadMs } = await createSession(model, backend);
-  const feeds = makeFeeds(ort, session);
+  const { ort, session, loadMs } = await createOnnxSession(model, backend);
+  const feeds = makeOnnxFeeds(ort, session);
 
   for (let index = 0; index < warmup; index += 1) {
     await session.run(feeds);
@@ -230,6 +337,7 @@ async function runBenchmark(
 
   return {
     modelName: model.name,
+    runtime: 'onnxruntime-web',
     backend,
     warmup,
     runs,
@@ -240,8 +348,80 @@ async function runBenchmark(
     minMs: sorted[0] ?? 0,
     maxMs: sorted.at(-1) ?? 0,
     samplesMs,
-    outputs,
+    outputs: sortOutputMetadata(outputs),
   };
+}
+
+async function runLiteRtBenchmark(
+  model: ModelEntry,
+  backend: Backend,
+  warmup: number,
+  runs: number,
+): Promise<BenchmarkResult> {
+  const { liteRt, compiledModel, loadMs } = await createLiteRtModel(model, backend);
+  const feeds = makeLiteRtFeeds(liteRt, compiledModel);
+
+  try {
+    for (let index = 0; index < warmup; index += 1) {
+      const outputs = await compiledModel.run(feeds);
+      deleteLiteRtTensors(Object.values(outputs));
+    }
+
+    const samplesMs: number[] = [];
+    let outputMetadata: Array<{ name: string; dims: readonly number[]; type: string }> = compiledModel
+      .getOutputDetails()
+      .map((output) => ({
+        name: output.name,
+        dims: Array.from(output.shape),
+        type: output.dtype,
+      }));
+
+    for (let index = 0; index < runs; index += 1) {
+      const start = performance.now();
+      const outputs = await compiledModel.run(feeds);
+      samplesMs.push(performance.now() - start);
+      outputMetadata = Object.entries(outputs).map(([name, tensor]) => ({
+        name,
+        dims: Array.from(tensor.type.layout.dimensions),
+        type: tensor.type.dtype,
+      }));
+      deleteLiteRtTensors(Object.values(outputs));
+    }
+
+    const sorted = [...samplesMs].sort((a, b) => a - b);
+    const sum = samplesMs.reduce((total, sample) => total + sample, 0);
+
+    return {
+      modelName: model.name,
+      runtime: 'litert',
+      backend,
+      warmup,
+      runs,
+      loadMs,
+      avgMs: sum / samplesMs.length,
+      medianMs: percentile(sorted, 0.5),
+      p95Ms: percentile(sorted, 0.95),
+      minMs: sorted[0] ?? 0,
+      maxMs: sorted.at(-1) ?? 0,
+      samplesMs,
+      outputs: sortOutputMetadata(outputMetadata),
+    };
+  } finally {
+    deleteLiteRtTensors(Object.values(feeds));
+    compiledModel.delete();
+  }
+}
+
+async function runBenchmark(
+  model: ModelEntry,
+  backend: Backend,
+  warmup: number,
+  runs: number,
+): Promise<BenchmarkResult> {
+  if (model.runtime === 'litert') {
+    return await runLiteRtBenchmark(model, backend, warmup, runs);
+  }
+  return await runOnnxBenchmark(model, backend, warmup, runs);
 }
 
 function formatMs(value: number): string {
@@ -253,6 +433,7 @@ function renderResult(result: BenchmarkResult) {
   summaryEl.innerHTML = `
     <dl>
       <dt>Model</dt><dd>${result.modelName}</dd>
+      <dt>Runtime</dt><dd>${result.runtime === 'litert' ? 'LiteRT.js' : 'onnxruntime-web'}</dd>
       <dt>Backend</dt><dd>${result.backend}</dd>
       <dt>Load</dt><dd>${formatMs(result.loadMs)}</dd>
       <dt>Avg Inference</dt><dd>${formatMs(result.avgMs)}</dd>
@@ -269,11 +450,27 @@ function renderResult(result: BenchmarkResult) {
 }
 
 function selectedModel(): ModelEntry {
-  const model = manifest.models.find((entry) => entry.name === modelSelect.value);
+  const model = manifest.models.find((entry) => entry.name === modelSelect.value && entry.runtime === runtimeSelect.value);
   if (!model) {
     throw new Error('No model selected.');
   }
   return model;
+}
+
+function updateModelOptions(preferredModel?: string) {
+  const runtime = runtimeSelect.value as Runtime;
+  const models = manifest.models.filter((model) => model.runtime === runtime);
+  modelSelect.innerHTML = models
+    .map((model) => `<option value="${model.name}">${model.name} (${(model.bytes / 1024 / 1024).toFixed(2)} MiB)</option>`)
+    .join('');
+
+  if (preferredModel && models.some((model) => model.name === preferredModel)) {
+    modelSelect.value = preferredModel;
+  }
+
+  modelSelect.disabled = models.length === 0;
+  runButton.disabled = models.length === 0;
+  statusEl.textContent = `${models.length} ${runtime === 'litert' ? 'LiteRT.js' : 'ONNX'} model(s) ready`;
 }
 
 async function runFromUi() {
@@ -301,10 +498,7 @@ async function loadManifest() {
     throw new Error(`Failed to load manifest: ${response.status}`);
   }
   manifest = (await response.json()) as Manifest;
-  modelSelect.innerHTML = manifest.models
-    .map((model) => `<option value="${model.name}">${model.name} (${(model.bytes / 1024 / 1024).toFixed(2)} MiB)</option>`)
-    .join('');
-  statusEl.textContent = `${manifest.models.length} model(s) ready`;
+  updateModelOptions();
   webGpuAvailable = await checkWebGpuAvailable();
   const webGpuOption = backendSelect.querySelector<HTMLOptionElement>('option[value="webgpu"]');
   if (webGpuOption && !webGpuAvailable) {
@@ -319,10 +513,10 @@ async function autoRunIfRequested() {
     return;
   }
 
+  const requestedRuntime = params.get('runtime') === 'litert' ? 'litert' : 'onnxruntime-web';
+  runtimeSelect.value = requestedRuntime;
   const requestedModel = params.get('model') ?? 'chc_s.onnx';
-  if ([...modelSelect.options].some((option) => option.value === requestedModel)) {
-    modelSelect.value = requestedModel;
-  }
+  updateModelOptions(requestedModel);
   backendSelect.value = params.get('backend') === 'webgpu' ? 'webgpu' : 'wasm';
   warmupInput.value = params.get('warmup') ?? '2';
   runsInput.value = params.get('runs') ?? '10';
@@ -345,6 +539,10 @@ async function autoRunIfRequested() {
 
 runButton.addEventListener('click', () => {
   void runFromUi();
+});
+
+runtimeSelect.addEventListener('change', () => {
+  updateModelOptions();
 });
 
 loadManifest()
