@@ -63,3 +63,34 @@ uv run sit4onnx \
 ```
 
 For `chc_s_wo_fiqa.onnx`, omit `head_image_352x352.npy`.
+
+## Browser benchmark app
+
+The Electron benchmark app lives in `benchmark-app/` and runs ONNX Runtime Web
+inside the Chromium renderer. JavaScript dependencies are pinned exactly in
+`package.json` and locked by `pnpm-lock.yaml`.
+
+```bash
+cd benchmark-app
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+During dev, root-level `chc_*.onnx` files and ONNX Runtime Web assets are served
+directly by the Vite asset plugin. During `vite build`, the same plugin copies
+models into `benchmark-app/dist/models/` and ONNX Runtime Web assets into
+`benchmark-app/dist/ort/`. These copied assets are generated files and are not
+tracked by git.
+
+Build and smoke-test the app:
+
+```bash
+cd benchmark-app
+pnpm build
+pnpm benchmark:wasm
+pnpm benchmark:webgpu
+```
+
+`benchmark:wasm` should run anywhere Electron can start. `benchmark:webgpu`
+requires a Chromium WebGPU-capable environment and may report that the backend is
+unsupported when no GPU adapter is available.
