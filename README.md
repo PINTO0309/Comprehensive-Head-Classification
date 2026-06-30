@@ -1,6 +1,8 @@
 # Comprehensive-Head-Classification
 Comprehensive Head Classification. Presence/absence of sunglasses, presence/absence of a mask, eyes open/closed, mouth open/closed, simple/complex background, face image quality assessment (FIQA).
 
+It is capable of rapidly performing six types of classification and inference in a single inference pass.
+
 <img width="1884" height="1075" alt="image" src="https://github.com/user-attachments/assets/41dfd45d-2f34-4c10-b0a2-f20d72a921f3" />
 
 ## Build merged ONNX models
