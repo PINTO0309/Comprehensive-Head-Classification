@@ -1217,6 +1217,17 @@ function selectedModel(): ModelEntry {
   return model;
 }
 
+function defaultModelName(runtime: Runtime, models: readonly ModelEntry[]): string | undefined {
+  if (runtime === 'litert') {
+    return (
+      models.find((model) => model.name.includes('_wo_fiqa_'))?.name ??
+      models.find((model) => model.name.endsWith('_wo_fiqa_float32.tflite'))?.name ??
+      models[0]?.name
+    );
+  }
+  return models.find((model) => !model.name.includes('_wo_fiqa'))?.name ?? models[0]?.name;
+}
+
 function updateModelOptions(preferredModel?: string) {
   const runtime = runtimeSelect.value as Runtime;
   const mode = inputModeSelect.value as InputMode;
@@ -1227,6 +1238,11 @@ function updateModelOptions(preferredModel?: string) {
 
   if (preferredModel && models.some((model) => model.name === preferredModel)) {
     modelSelect.value = preferredModel;
+  } else {
+    const defaultName = defaultModelName(runtime, models);
+    if (defaultName) {
+      modelSelect.value = defaultName;
+    }
   }
 
   const hasDetector = (manifest.detectors ?? []).some((detector) => detector.runtime === runtime);
@@ -1301,7 +1317,7 @@ async function autoRunIfRequested() {
   const requestedRuntime = params.get('runtime') === 'litert' ? 'litert' : 'onnxruntime-web';
   runtimeSelect.value = requestedRuntime;
   inputModeSelect.value = params.get('mode') === 'demo_image' ? 'demo_image' : 'synthetic_tensor';
-  const requestedModel = params.get('model') ?? (requestedRuntime === 'litert' ? 'chc_s_float32.tflite' : 'chc_s.onnx');
+  const requestedModel = params.get('model') ?? undefined;
   updateModelOptions(requestedModel);
   backendSelect.value = params.get('backend') === 'webgpu' ? 'webgpu' : 'wasm';
   warmupInput.value = params.get('warmup') ?? '2';

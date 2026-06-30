@@ -9,7 +9,7 @@ const requestedRuntime = benchmarkArgs[0] === 'litert' ? 'litert' : 'onnxruntime
 const backend = requestedRuntime === 'litert' ? (benchmarkArgs[1] ?? 'wasm') : (benchmarkArgs[0] ?? 'wasm');
 const model =
   requestedRuntime === 'litert'
-    ? (benchmarkArgs[2] ?? 'chc_s_float32.tflite')
+    ? (benchmarkArgs[2] ?? 'chc_s_wo_fiqa_float32.tflite')
     : (benchmarkArgs[1] ?? 'chc_s.onnx');
 const children = [];
 
