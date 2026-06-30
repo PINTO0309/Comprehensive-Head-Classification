@@ -1,5 +1,5 @@
 # Comprehensive-Head-Classification
-Comprehensive Head Classification. Presence/absence of sunglasses, presence/absence of a mask, eyes open/closed, mouth open/closed, simple/complex background, face image quality assessment (FIQA).
+Comprehensive head classification. Presence/absence of hats, sunglasses, and masks; eyes open/closed; mouth open/closed; background simplicity/complexity; and Face Image Quality Assessment (FIQA).
 
 It is capable of rapidly performing six types of classification and inference in a single inference pass.
 
