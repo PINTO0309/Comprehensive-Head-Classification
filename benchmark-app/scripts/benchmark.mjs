@@ -2,12 +2,15 @@ import { spawn } from 'node:child_process';
 import http from 'node:http';
 import net from 'node:net';
 
-const requestedRuntime = process.argv[2] === 'litert' ? 'litert' : 'onnxruntime-web';
-const backend = requestedRuntime === 'litert' ? (process.argv[3] ?? 'wasm') : (process.argv[2] ?? 'wasm');
+const args = process.argv.slice(2);
+const mode = args[0] === 'demo' || args[0] === 'demo_image' ? 'demo_image' : 'synthetic_tensor';
+const benchmarkArgs = mode === 'demo_image' ? args.slice(1) : args;
+const requestedRuntime = benchmarkArgs[0] === 'litert' ? 'litert' : 'onnxruntime-web';
+const backend = requestedRuntime === 'litert' ? (benchmarkArgs[1] ?? 'wasm') : (benchmarkArgs[0] ?? 'wasm');
 const model =
   requestedRuntime === 'litert'
-    ? (process.argv[4] ?? 'chc_s_float32.tflite')
-    : (process.argv[3] ?? 'chc_s.onnx');
+    ? (benchmarkArgs[2] ?? 'chc_s_float32.tflite')
+    : (benchmarkArgs[1] ?? 'chc_s.onnx');
 const children = [];
 
 function run(command, args, options = {}) {
@@ -86,6 +89,7 @@ try {
         'electron',
         '.',
         '--benchmark',
+        `--mode=${mode}`,
         `--runtime=${requestedRuntime}`,
         `--backend=${backend}`,
         `--model=${model}`,

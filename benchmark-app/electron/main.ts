@@ -3,6 +3,7 @@ import path from 'node:path';
 
 type CliBenchmarkOptions = {
   auto: boolean;
+  mode: 'synthetic_tensor' | 'demo_image';
   runtime: 'onnxruntime-web' | 'litert';
   backend: 'wasm' | 'webgpu';
   model: string;
@@ -37,8 +38,10 @@ function parseCliBenchmarkOptions(): CliBenchmarkOptions {
   };
   const backend = readValue('backend', 'wasm');
   const runtime = readValue('runtime', 'onnxruntime-web');
+  const mode = readValue('mode', 'synthetic_tensor');
   return {
     auto: args.includes('--benchmark'),
+    mode: mode === 'demo_image' ? 'demo_image' : 'synthetic_tensor',
     runtime: runtime === 'litert' ? 'litert' : 'onnxruntime-web',
     backend: backend === 'webgpu' ? 'webgpu' : 'wasm',
     model: readValue('model', 'chc_s.onnx'),
@@ -53,6 +56,7 @@ function benchmarkUrl(baseUrl: string, options: CliBenchmarkOptions): string {
   }
   const url = new URL(baseUrl);
   url.searchParams.set('auto', '1');
+  url.searchParams.set('mode', options.mode);
   url.searchParams.set('runtime', options.runtime);
   url.searchParams.set('backend', options.backend);
   url.searchParams.set('model', options.model);
@@ -64,7 +68,14 @@ function benchmarkUrl(baseUrl: string, options: CliBenchmarkOptions): string {
 async function createWindow() {
   const cliOptions = parseCliBenchmarkOptions();
   if (cliOptions.auto) {
-    const timeoutMs = cliOptions.backend === 'webgpu' ? 20000 : 120000;
+    const timeoutMs =
+      cliOptions.mode === 'demo_image'
+        ? cliOptions.backend === 'webgpu'
+          ? 60000
+          : 180000
+        : cliOptions.backend === 'webgpu'
+          ? 20000
+          : 120000;
     setTimeout(() => {
       console.log(
         JSON.stringify(
@@ -81,8 +92,8 @@ async function createWindow() {
   }
   const window = new BrowserWindow({
     width: 1180,
-    height: 900,
-    minHeight: 860,
+    height: 1240,
+    minHeight: 1120,
     show: !cliOptions.auto,
     backgroundColor: '#f6f7f9',
     webPreferences: {
@@ -102,6 +113,7 @@ async function createWindow() {
     query: cliOptions.auto
       ? {
           auto: '1',
+          mode: cliOptions.mode,
           runtime: cliOptions.runtime,
           backend: cliOptions.backend,
           model: cliOptions.model,

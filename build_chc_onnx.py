@@ -85,7 +85,7 @@ def make_branch_specs(
             source_input="images",
             public_input="head_image_48x48",
             source_output="prob_plain",
-            public_output="prob_background_plain",
+            public_output="prob_bg_plain",
             batch_size=1,
         ),
         BranchSpec(
@@ -103,7 +103,16 @@ def make_branch_specs(
             source_input="images",
             public_input="head_image_48x48",
             source_output="prob_sunglasses",
-            public_output="prob_sunglasses",
+            public_output="prob_sunglass",
+            batch_size=1,
+        ),
+        BranchSpec(
+            name="hhc_is",
+            model_path=model_dir / f"hhc_is_{variant}_48x48.onnx",
+            source_input="images",
+            public_input="head_image_48x48",
+            source_output="prob_wearing_hat",
+            public_output="prob_hat",
             batch_size=1,
         ),
         BranchSpec(

@@ -12,7 +12,11 @@
     "benchmark:wasm": "node scripts/benchmark.mjs wasm",
     "benchmark:webgpu": "node scripts/benchmark.mjs webgpu",
     "benchmark:litert:wasm": "node scripts/benchmark.mjs litert wasm",
-    "benchmark:litert:webgpu": "node scripts/benchmark.mjs litert webgpu"
+    "benchmark:litert:webgpu": "node scripts/benchmark.mjs litert webgpu",
+    "benchmark:demo:wasm": "node scripts/benchmark.mjs demo wasm",
+    "benchmark:demo:webgpu": "node scripts/benchmark.mjs demo webgpu",
+    "benchmark:demo:litert:wasm": "node scripts/benchmark.mjs demo litert wasm",
+    "benchmark:demo:litert:webgpu": "node scripts/benchmark.mjs demo litert webgpu"
   },
   "dependencies": {
     "@litertjs/core": "2.5.2",

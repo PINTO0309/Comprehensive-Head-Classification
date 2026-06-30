@@ -15,6 +15,9 @@ const liteRtAssetPattern = /^litert_wasm_.*\.(wasm|js)$/;
 const onnxModelPattern = /^chc_.+\.onnx$/;
 const tfliteModelPattern = /^chc_.+_float32\.tflite$/;
 const modelPattern = /^(chc_.+\.onnx|chc_.+_float32\.tflite)$/;
+const detectorPattern = /^yolomit_t_wholebody28_1x3x480x640(_float32)?\.(onnx|tflite)$/;
+const demoImagePattern = /\.(png|jpe?g)$/i;
+const demoImageDir = path.join(repoRoot, 'demo_images');
 
 type ModelEntry = {
   name: string;
@@ -23,6 +26,14 @@ type ModelEntry = {
   withFiqa: boolean;
   format: 'onnx' | 'tflite';
   runtime: 'onnxruntime-web' | 'litert';
+};
+
+type DetectorEntry = Omit<ModelEntry, 'withFiqa'>;
+
+type DemoImageEntry = {
+  name: string;
+  path: string;
+  bytes: number;
 };
 
 async function listOrtAssets(): Promise<string[]> {
@@ -57,8 +68,60 @@ async function listModels(): Promise<ModelEntry[]> {
   return models.sort((a, b) => a.runtime.localeCompare(b.runtime) || a.name.localeCompare(b.name));
 }
 
-function modelManifest(models: ModelEntry[]): string {
-  return `${JSON.stringify({ generatedAt: new Date().toISOString(), models }, null, 2)}\n`;
+async function listDetectors(): Promise<DetectorEntry[]> {
+  const entries = await readdir(repoRoot);
+  const detectors: DetectorEntry[] = [];
+  for (const entry of entries) {
+    if (!detectorPattern.test(entry)) {
+      continue;
+    }
+    const sourcePath = path.join(repoRoot, entry);
+    const sourceStat = await stat(sourcePath);
+    if (!sourceStat.isFile()) {
+      continue;
+    }
+    const format = entry.endsWith('.onnx') ? 'onnx' : 'tflite';
+    detectors.push({
+      name: entry,
+      path: `/models/${entry}`,
+      bytes: sourceStat.size,
+      format,
+      runtime: format === 'onnx' ? 'onnxruntime-web' : 'litert',
+    });
+  }
+  return detectors.sort((a, b) => a.runtime.localeCompare(b.runtime) || a.name.localeCompare(b.name));
+}
+
+async function listDemoImages(): Promise<DemoImageEntry[]> {
+  let entries: string[];
+  try {
+    entries = await readdir(demoImageDir);
+  } catch {
+    return [];
+  }
+
+  const images: DemoImageEntry[] = [];
+  for (const entry of entries) {
+    if (!demoImagePattern.test(entry)) {
+      continue;
+    }
+    const sourcePath = path.join(demoImageDir, entry);
+    const sourceStat = await stat(sourcePath);
+    if (!sourceStat.isFile()) {
+      continue;
+    }
+    images.push({
+      name: entry,
+      path: `/demo-images/${entry}`,
+      bytes: sourceStat.size,
+    });
+  }
+  return images.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function modelManifest(): Promise<string> {
+  const [models, detectors, demoImages] = await Promise.all([listModels(), listDetectors(), listDemoImages()]);
+  return `${JSON.stringify({ generatedAt: new Date().toISOString(), models, detectors, demoImages }, null, 2)}\n`;
 }
 
 function contentTypeFor(fileName: string): string {
@@ -74,6 +137,12 @@ function contentTypeFor(fileName: string): string {
   if (fileName.endsWith('.json')) {
     return 'application/json; charset=utf-8';
   }
+  if (fileName.endsWith('.png')) {
+    return 'image/png';
+  }
+  if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
+    return 'image/jpeg';
+  }
   return 'text/javascript; charset=utf-8';
 }
 
@@ -85,7 +154,7 @@ function benchmarkAssetsPlugin(): Plugin {
         const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
         if (pathname === '/models/manifest.json') {
           try {
-            const body = modelManifest(await listModels());
+            const body = await modelManifest();
             res.setHeader('Content-Type', contentTypeFor('manifest.json'));
             res.setHeader('Content-Length', Buffer.byteLength(body));
             res.setHeader('Cache-Control', 'no-cache');
@@ -98,12 +167,37 @@ function benchmarkAssetsPlugin(): Plugin {
 
         if (pathname.startsWith('/models/')) {
           const fileName = path.basename(decodeURIComponent(pathname));
-          if (!modelPattern.test(fileName)) {
+          if (!modelPattern.test(fileName) && !detectorPattern.test(fileName)) {
             res.statusCode = 404;
             res.end('Not found');
             return;
           }
           const sourcePath = path.join(repoRoot, fileName);
+          try {
+            const sourceStat = await stat(sourcePath);
+            if (!sourceStat.isFile()) {
+              res.statusCode = 404;
+              res.end('Not found');
+              return;
+            }
+            res.setHeader('Content-Type', contentTypeFor(fileName));
+            res.setHeader('Content-Length', sourceStat.size);
+            res.setHeader('Cache-Control', 'no-cache');
+            createReadStream(sourcePath).pipe(res);
+          } catch (error) {
+            next(error);
+          }
+          return;
+        }
+
+        if (pathname.startsWith('/demo-images/')) {
+          const fileName = path.basename(decodeURIComponent(pathname));
+          if (!demoImagePattern.test(fileName)) {
+            res.statusCode = 404;
+            res.end('Not found');
+            return;
+          }
+          const sourcePath = path.join(demoImageDir, fileName);
           try {
             const sourceStat = await stat(sourcePath);
             if (!sourceStat.isFile()) {
@@ -192,13 +286,22 @@ function benchmarkAssetsPlugin(): Plugin {
       );
 
       const modelTargetDir = path.join(appDir, 'dist', 'models');
-      const models = await listModels();
+      const [models, detectors, demoImages] = await Promise.all([listModels(), listDetectors(), listDemoImages()]);
       await rm(modelTargetDir, { recursive: true, force: true });
       await mkdir(modelTargetDir, { recursive: true });
       await Promise.all(
-        models.map((model) => copyFile(path.join(repoRoot, model.name), path.join(modelTargetDir, model.name))),
+        [...models, ...detectors].map((model) =>
+          copyFile(path.join(repoRoot, model.name), path.join(modelTargetDir, model.name)),
+        ),
       );
-      await writeFile(path.join(modelTargetDir, 'manifest.json'), modelManifest(models));
+      await writeFile(path.join(modelTargetDir, 'manifest.json'), await modelManifest());
+
+      const demoImageTargetDir = path.join(appDir, 'dist', 'demo-images');
+      await rm(demoImageTargetDir, { recursive: true, force: true });
+      await mkdir(demoImageTargetDir, { recursive: true });
+      await Promise.all(
+        demoImages.map((image) => copyFile(path.join(demoImageDir, image.name), path.join(demoImageTargetDir, image.name))),
+      );
     },
   };
 }
