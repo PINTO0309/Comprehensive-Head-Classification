@@ -94,7 +94,7 @@ For `chc_s_wo_fiqa.onnx`, omit `head_image_352x352.npy`.
 
 ## Browser benchmark app
 
-Download `chc_*.onnx` and `chc_*.tflite` from [models](https://github.com/PINTO0309/Comprehensive-Head-Classification/releases/tag/models) and place them in the root folder.
+Download `chc_*.onnx` and `chc_*.tflite`, `yolomit_*.onnx`, `yolomit_*.tflite` from [models](https://github.com/PINTO0309/Comprehensive-Head-Classification/releases/tag/models) and place them in the root folder.
 
 The Electron benchmark app lives in `benchmark-app/` and runs ONNX Runtime Web
 or LiteRT.js inside the Chromium renderer. JavaScript dependencies are pinned
