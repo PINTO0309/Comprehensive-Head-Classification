@@ -114,7 +114,7 @@ During `vite build`, the same plugin copies models into
 `benchmark-app/dist/litert/wasm/`. These copied assets are generated files and
 are not tracked by git.
 
-<img width="1175" height="1226" alt="image" src="https://github.com/user-attachments/assets/e66cfe1c-c7c7-4ece-b829-21a3c8ceadca" />
+<img width="1176" height="1231" alt="image" src="https://github.com/user-attachments/assets/63cd811e-c42e-46d4-876d-0922a852292d" />
 
 During dev, root-level `chc_*.onnx` files and ONNX Runtime Web assets are served
 directly by the Vite asset plugin. During `vite build`, the same plugin copies
