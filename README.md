@@ -3,7 +3,7 @@ Comprehensive head classification. Presence/absence of hats, sunglasses, and mas
 
 It is capable of rapidly performing seven types of classification and inference in a single inference pass.
 
-<img width="1884" height="1075" alt="image" src="https://github.com/user-attachments/assets/41dfd45d-2f34-4c10-b0a2-f20d72a921f3" />
+<img width="2101" height="1073" alt="image" src="https://github.com/user-attachments/assets/456599bf-d18a-4d8a-b1be-3d5f88e52514" />
 
 ## Build merged ONNX models
 
