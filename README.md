@@ -136,3 +136,18 @@ pnpm benchmark:litert:webgpu
 The WASM smoke scripts should run anywhere Electron can start. WebGPU smoke
 scripts require a Chromium WebGPU-capable environment and may report that the
 backend is unsupported when no GPU adapter is available.
+
+## Cited - Ultra-lightweight classification model series
+
+1. [VSDLM: Visual-only speech detection driven by lip movements](https://github.com/PINTO0309/VSDLM) - MIT License
+2. [OCEC: Open closed eyes classification. Ultra-fast wink and blink estimation model](https://github.com/PINTO0309/OCEC) - MIT License
+3. [PGC: Ultrafast pointing gesture classification](https://github.com/PINTO0309/PGC) - MIT License
+4. [SC: Ultrafast sitting classification](https://github.com/PINTO0309/SC) - MIT License
+5. [PUC: Phone Usage Classifier is a three-class image classification pipeline for understanding how people
+interact with smartphones](https://github.com/PINTO0309/PUC) - MIT License
+6. [HSC: Happy smile classifier](https://github.com/PINTO0309/HSC) - MIT License
+7. [WHC: Waving Hand Classification](https://github.com/PINTO0309/WHC) - MIT License
+8. [UHD: Ultra-lightweight human detection](https://github.com/PINTO0309/UHD) - MIT License
+9. [MWC: Mask wearing classifier.](https://github.com/PINTO0309/MWC) - MIT License
+10. [SGC: Classification of wearing vs. not wearing sunglasses. 48x48.](https://github.com/PINTO0309/SGC) - MIT License
+11. [HHC: Head Hat Classification. HHC is a binary classifier for cropped head images. 48x48.](https://github.com/PINTO0309/HHC) - MIT License
