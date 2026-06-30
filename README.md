@@ -29,6 +29,8 @@ uv run build-chc-onnx --variant s --output /path/to/output.onnx
 
 ## Benchmark ONNX models
 
+Download `chc_*.onnx` from [models](https://github.com/PINTO0309/Comprehensive-Head-Classification/releases/tag/models) and place them in the root folder.
+
 Use `sit4onnx` through uv after building the merged ONNX files:
 
 ```bash
@@ -69,6 +71,8 @@ uv run sit4onnx \
 For `chc_s_wo_fiqa.onnx`, omit `head_image_352x352.npy`.
 
 ## Browser benchmark app
+
+Download `chc_*.onnx` and `chc_*.tflite` from [models](https://github.com/PINTO0309/Comprehensive-Head-Classification/releases/tag/models) and place them in the root folder.
 
 The Electron benchmark app lives in `benchmark-app/` and runs ONNX Runtime Web
 or LiteRT.js inside the Chromium renderer. JavaScript dependencies are pinned
