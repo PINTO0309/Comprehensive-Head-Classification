@@ -76,7 +76,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-<img width="900" alt="20260630112734" src="https://github.com/user-attachments/assets/33ba5491-5479-43ef-888e-87f17238fad7" />
+<img width="900" alt="image" src="https://github.com/user-attachments/assets/da95f5ef-7880-4ac2-afc8-e43a6bb0c79e" />
 
 During dev, root-level `chc_*.onnx` files and ONNX Runtime Web assets are served
 directly by the Vite asset plugin. During `vite build`, the same plugin copies
