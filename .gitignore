@@ -218,3 +218,11 @@ __marimo__/
 .streamlit/secrets.toml
 
 *.onnx
+
+# Node / Electron benchmark app
+benchmark-app/node_modules/
+benchmark-app/dist/
+benchmark-app/dist-electron/
+benchmark-app/public/models/
+benchmark-app/public/ort/
+benchmark-app/.vite/
