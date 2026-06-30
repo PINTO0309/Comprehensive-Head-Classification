@@ -17,7 +17,7 @@ Input normalization:
 
 Merged model outputs:
 
-- `prob_bg_plain`: `[1]`, probability that the background is plain/simple
+- `prob_bg_plain`: `[1]`, probability that the background is plain/complicated
 - `prob_masked`: `[1]`, probability that the person is wearing a mask
 - `prob_sunglass`: `[1]`, probability that the person is wearing sunglasses
 - `prob_hat`: `[1]`, probability that the person is wearing a hat
